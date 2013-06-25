@@ -1,0 +1,6 @@
+samplePaths         Sample random paths of various lengths within the network
+scope               Compute the scope of a compound
+readSBML            Read an SBML file
+makeReactionGraph   Makes a graph of connected reactions
+
+

@@ -1,0 +1,13 @@
+useDynLib(PathScope)
+
+export(getKEGG,
+       removeUnobservedGenes,
+       computeGeneNetwork,
+       defineNeighborhood,
+       edgeSums,
+       assignEdgeWeights,
+       samplePaths,
+       scope,
+       readSBML,
+       makeReactionNetwork,
+       defineReactionNeighborhood)

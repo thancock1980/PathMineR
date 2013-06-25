@@ -1,0 +1,9 @@
+Package: PathScope
+Version: 0.1
+Date: 2010 onwards
+Title: PathRanker for Mining Metabolic Network
+Author: Tim Hancock <timothy.hancock@kuir.kyoto-u.ac.jp>, Ichigaku Takigawa <takigawa@kuicr.kyoto-u.ac.jp>, Nicolas Wicker <nicolas.wicker@unistra.fr>
+Maintainer: Tim Hancock <timothy.hancock@kuir.kyoto-u.ac.jp>
+Description: Extract the scope of compound within a metabolic network.
+Depends: XML, RCurl
+License: GPL version 2 or newer 

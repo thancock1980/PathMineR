@@ -1,0 +1,23 @@
+samplePaths <- function(geneNetwork,edge.weights,maxpathlength,numberofsamples,numberofwarmup) {
+    ps <- .Call("samplepaths",
+                geneNetwork$nodes,
+                geneNetwork$edges,
+                edge.weights,
+                MAXPATHLENGTH = as.integer(maxpathlength),
+                SAMPLEPATHS = as.integer(numberofsamples),
+                WARMUPSTEPS = as.integer(numberofwarmup))
+    return(matrix(ps,maxpathlength+1,numberofsamples,byrow = TRUE))
+}
+
+scope <- function(geneNetwork,edge.weights,sampledpaths,alpha = 0.01,echo = 0) {    
+    z <- .Call("scope",
+            NODES = geneNetwork$nodes,
+            EDGES = geneNetwork$edges,
+            WEIGHTS = -log(edge.weights),
+            SAMPLEDPATHS = t(sampledpaths),
+            ALPHA = alpha,
+            ECHO = as.integer(echo))
+    zidx <- which(sapply(z$paths,is.null) == FALSE)
+    z$paths <- z$paths[zidx]
+    return(z)
+}

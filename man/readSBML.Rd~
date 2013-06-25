@@ -1,0 +1,34 @@
+\name{pathRanker}
+\alias{pathRanker}
+\title{Extracts the K most probable paths within a metabolic network.}
+\description{Extracts the K most probable paths within a metabolic network.}
+
+\usage{
+ypaths <- pathRanker(geneNetwork,edge.weights,K=10,minPathSize = 1,sameGenePenalty = 1/10,normalize = TRUE) 
+}
+\arguments{
+\item{geneNetwork}{A gene network with probabilitic edge list as given by \code{\link{assignEdgeWeights}}.}
+\item{edge.weights}{A matrix of weights for each edge.  Each column in the matrix corresponds the label of a specified response (\code{\link{assignEdgeWeights}}).  An individual set of paths will be extracted using each set of columns.}
+\item{K}{Maximum number of paths to extract.}
+\item{minPathSize}{The minimum number of edges for each path.}
+\item{sameGenePenalty}{The penalty for selecting the same gene in two neighboring reactions.}
+\item{normalize}{Specify if you want to normalize the probabilistic edge weights before extracting the paths.}
+}
+\value{
+A list of pathways where each path has the following items:
+\item{gene}{The ordered sequence of genes visited along the path.}
+\item{compounds}{The ordered sequence of compounds visited along the path.}
+\item{weights}{The ordered sequence of the log(ECDF edge weights) along the path.}
+\item{distance}{The sum of the log(ECDF edge weights) along each path.  (a sum of logs is a product)}
+}
+\details{
+\code{pathRanker} finds the K most probable loopless paths given a set of weights assigned to the network in computed by \code{\link{computeGeneNetwork}}. 
+
+A path is defined as a sequence of genes where each edge is labelled by the exact position within the metabolic network where it was observed.
+
+Before the paths are ranked the edge weights are converted into probabilistic edge weights using the Empirical Cumulative Distribution (ECDF) over all edge weights.  This is called ECDF edge weight. The ECDF edge weight serves as a probabilistic rank of the most important gene-gene interactions.  The probabilistic nature of the ECDF edge weights allow for a significance test to determine if a path contains any functional structure or is simply a random walk.  The probability of a path is simily the product of all ECDF weights along the path.  This is computed as a sum of the logs of the ECDF edge weights.
+
+A weight must be assigned to each edge. Bootstrapped Pearson correlation edge weights can be assigned to each edge by \code{\link{assignEdgeWeights}}. However the specification of the edge weight is flexible with the condition that increasing values indicate stronger relationships between genes.  See the structure of the matrix returned by \code{\link{assignEdgeWeights}} for the required data structure for the edge weights.
+
+As the same gene is likely to occur in neighboring reactions which may result in the weight becoming 0 for that edge.  If too many occurrence of 0 edge weight occur the method will get caught in small zero-sum loops within the network.  To avoid this use the \code{sameGenePenalty} option which replaces all weights of edges connected with the same gene to a specified value.  The same gene penalty adjustment is performed on the ECDF edge weights so the appropriate parameter range is [0,1] where 0 is the lowest and penalizes the strongest and 1 is the highest and corresponds to no same gene penalty.
+}

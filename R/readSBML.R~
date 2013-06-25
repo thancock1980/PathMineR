@@ -1,0 +1,183 @@
+readSBML <- function(filename) {
+    if (!file.exists(filename)) stop("Cannot find file!")
+
+    zsbml <- .Call("readsbmlfile", FILENAME = filename)
+
+    edge.list <- do.call("rbind",lapply(lapply(zsbml$reaction.info,"[[","edges"),"data.frame",stringsAsFactors = FALSE))
+    dimnames(edge.list)[[1]] <- 1:nrow(edge.list)
+    reaction.info <- lapply(zsbml$reaction.info,"[[","genes")
+    
+    zsbml$species.info <- data.frame(zsbml$species.info,stringsAsFactors = FALSE)
+
+    kobj <- list(edge.list = edge.list,
+                 reaction.info = reaction.info,
+                 species.info = zsbml$species.info,
+                 sbml.info = zsbml)
+
+   return(kobj)
+}
+
+makeReactionNetwork <- function(kobj) {
+    redges <- kobj$edge.list
+    edges <- NULL
+    
+    reaction.info <- kobj$reaction.info
+    rlens <- sapply(reaction.info,length)
+    nullreact <- names(reaction.info)[which(rlens == 0)]
+
+    #remove reactions with no genes
+    rmidx <- which(redges$label %in% nullreact)
+    if (length(rmidx) > 0) redges <- redges[-rmidx,]
+    all.reactions <- unique(redges$label)
+
+    reaction.info <- reaction.info[all.reactions]
+
+    rsbml <- kobj$sbml.info[1:2]
+    rsbml$reaction.info <- rsbml$reaction.info[all.reactions]
+
+    for (reaction in all.reactions) {
+        # all compounds (to.comps) produced by reaction
+        to.comps <- unique(redges[redges$label == reaction,]$to)        
+
+        # all reactions starting from compounds (to.comps)
+        r.to <- NULL
+        if (!is.null(to.comps)) r.to <- unique(redges[redges$from %in% to.comps,]$label)
+    
+        # if two reactions have different names but connect the same compounds in the same way with the same genes
+        # then remove them
+        if (length(r.to) > 0) {
+            indx <- 1; rmidx <- c()
+            for (r in r.to) {
+                etest <- identical(redges[redges$label == reaction,][1:2],
+                                   unique(rbind(redges[redges$label == reaction,][1:2],redges[redges$label == r,][1:2]))) 
+                gtest <- identical(reaction.info[[reaction]],unique(c(reaction.info[[reaction]],reaction.info[[r]])))
+                if (etest & gtest) rmidx <- c(rmidx,indx)
+                indx <- indx + 1
+            }
+            if (length(rmidx) > 0) r.to <- r.to[-rmidx]
+        }
+
+        # if an edge exists then...
+        rowframe <- NULL
+        if (length(r.to) > 0) rowframe <- data.frame(from = reaction,to = r.to,stringsAsFactors = FALSE)
+       
+        if (!is.null(rowframe)) {    
+            if (is.null(edges)) edges <- rowframe
+            else edges <- rbind(edges,rowframe)
+        }
+    }
+    # incase edges are duplicted
+    edges <- unique(edges)
+
+    # edges with the same start and end
+    rmidx <- which(edges$from == edges$to)
+    if (length(rmidx) > 0) edges <- edges[-rmidx,]
+
+    edges <- data.frame(edges,stringsAsFactors = FALSE)
+    names(edges) <- c("from","to")
+
+    #make the network
+    gnds <- names(reaction.info) 
+    edges$from  <- match(edges$from,gnds)
+    edges$to  <- match(edges$to,gnds)
+
+    reaction.info <- lapply(reaction.info,toupper)
+   
+    return(list(nodes = gnds,edges = edges,reaction.info = reaction.info,sbml.info = rsbml))
+}
+
+computeMaxReactionCorrelations <- function(reaction.network,microarray,y=NULL) {
+    zedgelist <- reaction.network$edges
+    zedgelist$from <- reaction.network$nodes[zedgelist$from]
+    zedgelist$to <- reaction.network$nodes[zedgelist$to]
+
+    # check for reverse edges
+    zforward <- paste(zedgelist$from,zedgelist$to,sep = ":")
+    zreverse <- paste(zedgelist$to,zedgelist$from,sep =":")
+    zrepeat <- rep(-1,length(zforward))
+    for (i in 1:length(zforward)) {
+        if (zrepeat[i] < 0) {
+            revidx <- grep(zforward[i],zreverse)
+            zrepeat[revidx] <- i
+        }
+    }
+    zedgelist$reverseindex <- as.integer(zrepeat-1)
+
+    # convert edge list to reaction indices
+    zreactionlist <- reaction.network$reaction.info
+
+    zedgelist$from <- as.integer(match(zedgelist$from,names(zreactionlist))-1)
+    zedgelist$to <- as.integer(match(zedgelist$to,names(zreactionlist))-1)
+
+    # convert reaction gene name list to indices within the microarray
+
+    zreactiongeneindicies <- lapply(lapply(lapply(zreactionlist,match,names(microarray)),"-",1),as.integer)
+
+    cors <- NULL
+    if (!is.null(y)) {
+        cors <- list()
+        for (i in 1:nlevels(y)) {
+            cat("\nComputering Correlations for ",levels(y)[i])
+            cors[[i]] <- .Call("compute_max_reaction_correlation",zedgelist,zreactiongeneindicies,as.matrix(microarray[y == levels(y)[i],]))
+        }
+        cors <- data.frame(do.call("cbind",cors))
+        names(cors) <- paste("cor",levels(y),sep = ":")
+    }
+    else {
+        cat("\nComputering Correlations")
+        cors <- .Call("compute_max_reaction_correlation",zedgelist,zreactiongeneindicies,as.matrix(microarray))
+        cors <- data.frame(cors)
+        names(cors) <- "cor"
+    }
+    cat("\n")
+
+    return(cors)
+}
+
+defineReactionNeighborhood <- function(rnet,edge.weights,seed,range,ann = "GRFT",mode = "out") {
+    sreactions <- which(sapply(lapply(lapply(rnet$sbml.info$reaction.info,"[[","reactants"),"%in%",seed),sum)>0)
+    if (length(sreactions) == 0) {
+      cat("\nSeed Compound",seed,"is never a substrate")
+       return(NULL)
+    } 
+
+    # define start node sets   
+    sreactions <- names(rnet$sbml.info$reaction.info)[sreactions]
+    sridx <- match(sreactions,rnet$nodes)
+    sedges <- data.frame(from = rep(1,length(sreactions)),to = sridx)
+    gedges <- rbind(sedges,rnet$edges+1)    
+    nds <- c("s",rnet$nodes)
+    sweights <- data.frame(matrix(1,nrow = nrow(sedges),ncol = ncol(edge.weights)))
+    names(sweights) <- names(edge.weights)
+    weights <- rbind(sweights,edge.weights)
+
+    # get the neighborhood from seed node
+    print(gedges)
+    ge <- graph.edgelist(el = as.matrix(gedges-1),directed = TRUE)
+
+    nidx <- neighborhood(ge,order = range,nodes = V(ge)[0],mode = mode)[[1]]
+    if (sum(nidx==0) > 0) nidx <- nidx[-which(nidx==0)]
+    scp <- nds[nidx]
+       
+    # define end node sets
+    tedges <- data.frame(from = nidx+1,to = rep(length(nds)+1,length(nidx)))
+    gedges <- rbind(gedges,tedges) 
+    nds <- c(nds,"t")
+    tweights <- data.frame(matrix(1,nrow = nrow(tedges),ncol = ncol(edge.weights)))
+    names(tweights) <- names(edge.weights)
+    weights <- rbind(weights,tweights)
+    
+    glabel <- paste(nds[gedges$from],nds[gedges$to],sep = ":")
+    gpath <- rep(rnet$sbml.info$network,nrow(gedges))
+    gedges$from <- as.integer(gedges$from)
+    gedges$to <- as.integer(gedges$to)
+    gedges$label <- glabel
+    gedges$pathway <- gpath
+    
+    nobj <- list(nodes = nds,edges = gedges)  
+
+    return(list(geneNetwork = nobj,edge.weights = weights,seed = seed,neighborhood = scp))
+}
+
+
+

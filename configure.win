@@ -1,0 +1,8 @@
+#!/bin/sh
+if test -d ./src/boost;
+	then 
+			echo 'found boostIncl header sources and tar archive;\n using what is there.'
+	else
+		  echo "untarring boost include tree...";
+		  cd src; tar zxf boost.tar.gz;
+fi;

@@ -1,0 +1,22 @@
+\name{defineReactionNeighborhood}
+\alias{defineReactionNeighborhood}
+\title{Creates a set of sample path p-values for each length given a weighted network.}
+\description{Randomly traverses paths of increasing lengths within a set network to create an empirical pathway distribution for more accurate determination of path significance.}
+
+\usage{
+neighbor.network <- defineReactionNeighborhood(rnet,edge.weights,seed,range,ann = "GRFT",mode = "out")
+}
+\arguments{
+\item{rnet}{The result from makeReactionNetwork.}
+\item{edge.weights}{The result from computeMaxReactionCorrelations.}
+\item{seed}{The starting compound for the scope analysis.}
+\item{range}{The maximum scope size.}
+\item{ann}{Not used anymore.}
+\item{mode}{The mode arguement of the neighborhood function in the igraph package.  The default is "out" which follows all outwards paths from the seed compound.}
+}
+\value{
+A network object suitable for scope analysis.
+}
+\details{
+Hmmm nothing really here.
+}
