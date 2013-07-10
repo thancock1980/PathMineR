@@ -1,0 +1,9 @@
+useDynLib(MetPathMineR)
+
+export(SBML2igraph,
+       KGML2igraph,
+       makeReactionNetwork,
+       makeGeneNetwork,
+       simplifyReactionNetwork,
+       assignEdgeWeights,
+       pathRanker)

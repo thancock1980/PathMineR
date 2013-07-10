@@ -1,0 +1,2 @@
+PKG_CXXFLAGS= -I . -Wno-deprecated -L/usr/local/lib/ 
+PKG_LIBS = -lsbml $(LAPACK_LIBS) $(BLAS_LIBS)
